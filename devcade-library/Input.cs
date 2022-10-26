@@ -36,27 +36,42 @@ namespace Devcade
     private static GamePadState p2LastState;
 
     /// <summary>
-    /// 
+    /// Checks if a button is currently pressed. 
     /// </summary>
-    /// <param name="playerNum"></param>
-    /// <param name="button"></param>
-    /// <returns></returns>
+    /// <param name="playerNum">The player whose controls should be checked.</param>
+    /// <param name="button">The button to check.</param>
+    /// <returns>True when button is pressed, false otherwise.</returns>
     public static bool GetButton(int playerNum, ArcadeButtons button)
     {
+      if (playerNum == 1 && p1State.IsButtonDown((Buttons)button)) { return true; }
+      if (playerNum == 2 && p2State.IsButtonDown((Buttons)button)) { return true; }
 
       return false;
     }
 
     /// <summary>
-    /// 
+    /// Checks if a button was pressed last frame. 
     /// </summary>
-    /// <param name="playerNum"></param>
-    /// <param name="button"></param>
-    /// <returns></returns>
-    public static bool GetButtonDown(int playerNum, ArcadeButtons button)
+    /// <param name="playerNum">The player whose controls should be checked.</param>
+    /// <param name="button">The button to check.</param>
+    /// <returns>True if the button was pressed last frame, false otherwise.</returns>
+    public static bool GetLastButton(int playerNum, ArcadeButtons button)
     {
+      if (playerNum == 1 && p1LastState.IsButtonDown((Buttons)button)) { return true; }
+      if (playerNum == 2 && p2LastState.IsButtonDown((Buttons)button)) { return true; }
 
       return false;
+    }
+
+    /// <summary>
+    /// Checks if a button was pressed down this frame.
+    /// </summary>
+    /// <param name="playerNum">The player whose controls should be checked.</param>
+    /// <param name="button">The button to check.</param>
+    /// <returns>True if the button transitioned from up to down in the current frame.</returns>
+    public static bool GetButtonDown(int playerNum, ArcadeButtons button)
+    {
+      return (GetButton(playerNum, button) && !GetLastButton(playerNum, button));
     }
 
     /// <summary>
