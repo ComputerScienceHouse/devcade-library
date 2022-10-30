@@ -28,12 +28,13 @@ namespace Devcade
       StickRight=Buttons.LeftThumbstickRight
     }
 
-
+    #region States
     private static GamePadState p1State;
     private static GamePadState p1LastState;
 
     private static GamePadState p2State;
     private static GamePadState p2LastState;
+    #endregion
 
     /// <summary>
     /// Checks if a button is currently pressed. 
@@ -55,7 +56,7 @@ namespace Devcade
     /// <param name="playerNum">The player whose controls should be checked.</param>
     /// <param name="button">The button to check.</param>
     /// <returns>True if the button was pressed last frame, false otherwise.</returns>
-    public static bool GetLastButton(int playerNum, ArcadeButtons button)
+    private static bool GetLastButton(int playerNum, ArcadeButtons button)
     {
       if (playerNum == 1 && p1LastState.IsButtonDown((Buttons)button)) { return true; }
       if (playerNum == 2 && p2LastState.IsButtonDown((Buttons)button)) { return true; }
@@ -68,49 +69,49 @@ namespace Devcade
     /// </summary>
     /// <param name="playerNum">The player whose controls should be checked.</param>
     /// <param name="button">The button to check.</param>
-    /// <returns>True if the button transitioned from up to down in the current frame.</returns>
+    /// <returns>True if the button transitioned from up to down in the current frame, false otherwise.</returns>
     public static bool GetButtonDown(int playerNum, ArcadeButtons button)
     {
       return (GetButton(playerNum, button) && !GetLastButton(playerNum, button));
     }
 
     /// <summary>
-    /// 
+    /// Checks if a button was released this frame.
     /// </summary>
-    /// <param name="playerNum"></param>
-    /// <param name="button"></param>
-    /// <returns></returns>
+    /// <param name="playerNum">The player whose controls should be checked.</param>
+    /// <param name="button">The button to check.</param>
+    /// <returns>True if the button transitioned from down to up in the current frame, false otherwise.</returns>
     public static bool GetButtonUp(int playerNum, ArcadeButtons button)
     {
-
-      return false;
+      return (!GetButton(playerNum, button) && GetLastButton(playerNum, button));
     }
 
     /// <summary>
-    /// 
+    /// Checks if a button is being held down.
     /// </summary>
-    /// <param name="playerNum"></param>
-    /// <param name="button"></param>
-    /// <returns></returns>
+    /// <param name="playerNum">The player whose controls should be checked.</param>
+    /// <param name="button">The button to check.</param>
+    /// <returns>True if the button was down last frame and is still down, false otherwise.</returns>
     public static bool GetButtonHeld(int playerNum, ArcadeButtons button)
     {
-
-      return false;
+      return (GetButton(playerNum, button) && GetLastButton(playerNum, button));
     }
 
     /// <summary>
-    /// 
+    /// Gets the stick position of a player.
     /// </summary>
-    /// <param name="playerNum"></param>
-    /// <returns></returns>
+    /// <param name="playerNum">The player whose controls should be checked.</param>
+    /// <returns>A Vector2 representing the stick direction.</returns>
     public static Vector2 GetStick(int playerNum)
     {
+      if (playerNum == 1) { return p1State.ThumbSticks.Left; }
+      if (playerNum == 2) { return p2State.ThumbSticks.Left; }
 
       return Vector2.Zero;
     }
 
     /// <summary>
-    /// 
+    /// Setup initial input states.
     /// </summary>
     public static void Initialize()
     {
@@ -121,7 +122,7 @@ namespace Devcade
     }
 
     /// <summary>
-    /// 
+    /// Updates input states.
     /// </summary>
     public static void Update()
     {
@@ -130,6 +131,5 @@ namespace Devcade
       p1State = GamePad.GetState(0);
       p2State = GamePad.GetState(1);
     }
-
   }
 }
