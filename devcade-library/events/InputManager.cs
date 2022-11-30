@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 
 namespace Devcade.events {
     public class InputManager {
         private static readonly Dictionary<string, InputManager> inputManagers = new();
-        private static Dictionary<string, bool> enabled = new();
+        private static readonly Dictionary<string, bool> enabled = new();
         private static readonly InputManager globalInputManager = new();
 
         private const int debounce = 6;
@@ -39,7 +39,7 @@ namespace Devcade.events {
             }
 
             public bool Matches(InputManager inputManager) {
-                if (!enabled[inputManager.name]) return false;
+                if (inputManager.name != null /* null is global manager */ && !enabled[inputManager.name]) return false;
                 switch (state) {
                     case State.Held:
                         if (inputManager.IsHeld(button)) return true;
@@ -59,10 +59,16 @@ namespace Devcade.events {
 
         private InputManager(string name) {
             this.name = name;
+            for(int i = 0; i < debounce; i++) {
+                _states[i] = new DevState();
+            }
         }
 
         private InputManager() {
             this.name = null;
+            for (int i = 0; i < debounce; i++) {
+                _states[i] = new DevState();
+            }
         }
 
         /// <summary>
@@ -80,10 +86,11 @@ namespace Devcade.events {
         }
 
         private void Update(DevState state) {
-            _states[ptr++] = state;
-            if (ptr > debounce) {
+            ptr++;
+            if (ptr >= debounce) {
                 ptr = 0;
             }
+            _states[ptr] = state;
             events.ForEach(e => {
                 bool _ = e.Matches(this) && e.Invoke();
             });
@@ -122,7 +129,7 @@ namespace Devcade.events {
             return false;
         }
         
-        public void OnPress(CButton btn, Action action, bool async = false) {
+        public void OnPressed(CButton btn, Action action, bool async = false) {
             events.Add(new Event {
                 button = btn,
                 state = State.Pressed,
@@ -131,7 +138,7 @@ namespace Devcade.events {
             });
         }
         
-        public void OnRelease(CButton btn, Action action, bool async = false) {
+        public void OnReleased(CButton btn, Action action, bool async = false) {
             events.Add(new Event {
                 button = btn,
                 state = State.Released,
@@ -149,12 +156,12 @@ namespace Devcade.events {
             });
         }
 
-        public static void OnPressGlobal(CButton btn, Action action, bool async = false) {
-            globalInputManager.OnPress(btn, action, async);
+        public static void OnPressedGlobal(CButton btn, Action action, bool async = false) {
+            globalInputManager.OnPressed(btn, action, async);
         }
         
-        public static void OnReleaseGlobal(CButton btn, Action action, bool async = false) {
-            globalInputManager.OnRelease(btn, action, async);
+        public static void OnReleasedGlobal(CButton btn, Action action, bool async = false) {
+            globalInputManager.OnReleased(btn, action, async);
         }
         
         public static void OnHeldGlobal(CButton btn, Action action, bool async = false) {
@@ -168,18 +175,18 @@ namespace Devcade.events {
             inputManagers[name].OnHeld(btn, action, async);
         }
         
-        public static void OnPress(CButton btn, Action action, string name, bool async = false) {
+        public static void OnPressed(CButton btn, Action action, string name, bool async = false) {
             if (!inputManagers.ContainsKey(name)) {
                 inputManagers[name] = new InputManager();
             }
-            inputManagers[name].OnPress(btn, action, async);
+            inputManagers[name].OnPressed(btn, action, async);
         }
         
-        public static void OnRelease(CButton btn, Action action, string name, bool async = false) {
+        public static void OnReleased(CButton btn, Action action, string name, bool async = false) {
             if (!inputManagers.ContainsKey(name)) {
                 inputManagers[name] = new InputManager();
             }
-            inputManagers[name].OnRelease(btn, action, async);
+            inputManagers[name].OnReleased(btn, action, async);
         }
 
         public static InputManager getInputManager(string name) {

@@ -62,10 +62,13 @@ namespace Devcade
     /// <returns>True if the button was pressed last frame, false otherwise.</returns>
     private static bool GetLastButton(int playerNum, ArcadeButtons button)
     {
-      if (playerNum == 1 && p1LastState.IsButtonDown((Buttons)button)) { return true; }
-      if (playerNum == 2 && p2LastState.IsButtonDown((Buttons)button)) { return true; }
-
-      return false;
+      switch (playerNum) {
+        case 1 when p1LastState.IsButtonDown((Buttons)button):
+        case 2 when p2LastState.IsButtonDown((Buttons)button):
+          return true;
+        default:
+          return false;
+      }
     }
 
     /// <summary>
@@ -124,10 +127,11 @@ namespace Devcade
       p1LastState = GamePad.GetState(0);
       p2LastState = GamePad.GetState(1);
     }
+    
     internal static void UpdateInternal() {
       internalUpdate = true;
       if (externalUpdate) {
-        throw new Exception("Cannot call Input.Update() and InputManager.Update() in the same project");
+        throw new Exception("Cannot use Input.Update() and InputManager.Update() in the same project");
       }
       p1LastState = p1State;
       p2LastState = p2State;
@@ -141,7 +145,7 @@ namespace Devcade
     public static void Update() {
       externalUpdate = true;
       if (internalUpdate) {
-        throw new Exception("Cannot call Input.Update() and InputManager.Update() in the same project");
+        throw new Exception("Cannot use Input.Update() and InputManager.Update() in the same project");
       }
       p1LastState = p1State;
       p2LastState = p2State;
