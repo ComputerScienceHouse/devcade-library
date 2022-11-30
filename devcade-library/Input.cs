@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework.Input;
+﻿using System;
+using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework;
 
 namespace Devcade
@@ -35,6 +36,9 @@ namespace Devcade
     private static GamePadState p2State;
     private static GamePadState p2LastState;
     #endregion
+    
+    private static bool externalUpdate = false;
+    private static bool internalUpdate = false;
 
     /// <summary>
     /// Checks if a button is currently pressed. 
@@ -120,16 +124,34 @@ namespace Devcade
       p1LastState = GamePad.GetState(0);
       p2LastState = GamePad.GetState(1);
     }
-
-    /// <summary>
-    /// Updates input states.
-    /// </summary>
-    public static void Update()
-    {
+    internal static void UpdateInternal() {
+      internalUpdate = true;
+      if (externalUpdate) {
+        throw new Exception("Cannot call Input.Update() and InputManager.Update() in the same project");
+      }
       p1LastState = p1State;
       p2LastState = p2State;
       p1State = GamePad.GetState(0);
       p2State = GamePad.GetState(1);
+    }
+
+    /// <summary>
+    /// Updates input states.
+    /// </summary>
+    public static void Update() {
+      externalUpdate = true;
+      if (internalUpdate) {
+        throw new Exception("Cannot call Input.Update() and InputManager.Update() in the same project");
+      }
+      p1LastState = p1State;
+      p2LastState = p2State;
+      p1State = GamePad.GetState(0);
+      p2State = GamePad.GetState(1);
+    }
+    
+    public static (GamePadState, GamePadState) GetStates()
+    {
+      return (p1State, p2State);
     }
   }
 }
