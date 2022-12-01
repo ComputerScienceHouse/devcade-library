@@ -168,21 +168,21 @@ namespace Devcade.events {
             globalInputManager.OnHeld(btn, action, async);
         }
         
-        public static void OnHeld(CButton btn, Action action, string name, bool async = false) {
+        public static void OnHeld(CButton btn, string name, Action action, bool async = false) {
             if (!inputManagers.ContainsKey(name)) {
                 inputManagers[name] = new InputManager();
             }
             inputManagers[name].OnHeld(btn, action, async);
         }
         
-        public static void OnPressed(CButton btn, Action action, string name, bool async = false) {
+        public static void OnPressed(CButton btn, string name, Action action, bool async = false) {
             if (!inputManagers.ContainsKey(name)) {
                 inputManagers[name] = new InputManager();
             }
             inputManagers[name].OnPressed(btn, action, async);
         }
         
-        public static void OnReleased(CButton btn, Action action, string name, bool async = false) {
+        public static void OnReleased(CButton btn, string name, Action action, bool async = false) {
             if (!inputManagers.ContainsKey(name)) {
                 inputManagers[name] = new InputManager();
             }
