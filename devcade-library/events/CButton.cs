@@ -136,19 +136,12 @@ namespace Devcade.events {
         public static CButton or(params object[] btns) {
             var cbtns = new CButton[btns.Length];
             for (int i = 0; i < btns.Length; i++) {
-                switch (btns[i]) {
-                    case CButton _:
-                        cbtns[i] = (CButton)btns[i];
-                        break;
-                    case Buttons _:
-                        cbtns[i] = from((Buttons)btns[i]);
-                        break;
-                    case Keys _:
-                        cbtns[i] = from((Keys)btns[i]);
-                        break;
-                    default:
-                        throw new ArgumentException("buttons must only contain CompoundButtons, Buttons, or Keys");
-                }
+                cbtns[i] = btns[i] switch {
+                    CButton _ => (CButton)btns[i],
+                    Buttons _ => from((Buttons)btns[i]),
+                    Keys _ => from((Keys)btns[i]),
+                    _ => throw new ArgumentException("buttons must only contain CompoundButtons, Buttons, or Keys")
+                };
             }
             return or(cbtns);
         }

@@ -158,7 +158,7 @@ InputManager submenuManager = InputManager.getInputManager("submenu");
 
 // This is not necessary, as binding groups are enabled by default.
 // This is only to demonstrate how to enable and disable groups
-submentManager.setEnabled(true);
+submenuManager.setEnabled(true);
 
 submenuManager.onPressed(up, () => {
   selected--;

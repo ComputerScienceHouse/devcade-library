@@ -5,8 +5,10 @@ using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 
-namespace Devcade.events {
-    public class InputManager {
+namespace Devcade.events
+{
+    public class InputManager
+    {
         private static readonly Dictionary<string, InputManager> inputManagers = new();
         private static readonly Dictionary<string, bool> enabled = new();
         private static readonly InputManager globalInputManager = new();
@@ -17,12 +19,14 @@ namespace Devcade.events {
         private readonly List<Event> events = new();
         public string name { get; }
 
-        private enum State {
+        private enum State
+        {
             Held,
             Released,
             Pressed,
         }
-        private struct Event {
+        private struct Event
+        {
             public CButton button { get; set; }
             public State state { get; set; }
             public Action action { get; set; }
@@ -39,16 +43,24 @@ namespace Devcade.events {
             }
 
             public bool Matches(InputManager inputManager) {
-                if (inputManager.name != null /* null is global manager */ && !enabled[inputManager.name]) return false;
+                if (inputManager.name != null /* null is global manager */ && !enabled[inputManager.name]) {
+                    return false;
+                }
                 switch (state) {
                     case State.Held:
-                        if (inputManager.IsHeld(button)) return true;
+                        if (inputManager.IsHeld(button)) {
+                            return true;
+                        }
                         break;
                     case State.Pressed:
-                        if (inputManager.IsPressed(button)) return true;
+                        if (inputManager.IsPressed(button)) {
+                            return true;
+                        }
                         break;
                     case State.Released:
-                        if (inputManager.IsReleased(button)) return true;
+                        if (inputManager.IsReleased(button)) {
+                            return true;
+                        }
                         break;
                     default:
                         throw new ArgumentOutOfRangeException();
@@ -122,7 +134,6 @@ namespace Devcade.events {
                 else {
                     return false; // if any of the previous frames were not held, then it is not held
                 }
-
                 if (acc > 1) return true;
             }
 
