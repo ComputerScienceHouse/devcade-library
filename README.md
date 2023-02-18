@@ -6,6 +6,7 @@ A monogame library for allowing games to interact with cabinet functions.
 - [Input](#input-wrapping)
   - [ArcadeButtons enum](#arcadebuttons-enum)
   - [Get methods](#get-methods)
+- [Save data](#save-data)
   
 ---
 ---
