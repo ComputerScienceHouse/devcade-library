@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Devcade</RootNamespace>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     <Company>Computer Science House</Company>
     <Product>Devcade</Product>
     <Authors>Noah Emke</Authors>
@@ -10,17 +10,28 @@
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <RepositoryUrl>https://github.com/ComputerScienceHouse/Devcade-library</RepositoryUrl>
     <RepositoryType>Github</RepositoryType>
-    <LangVersion>latest</LangVersion>
+    <AssemblyVersion></AssemblyVersion>
+    <Version>$(VersionPrefix)1.2.0</Version>
+    <Title>Devcade Library</Title>
+    <PackageProjectUrl>https://devcade.csh.rit.edu/</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Added save and load functions to communicate with a new backend.</PackageReleaseNotes>
+    <GenerateDocumentationFile>False</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.0.1641">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\LICENSE">
       <Pack>True</Pack>
       <PackagePath></PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
     </None>
   </ItemGroup>
 </Project>

@@ -27,11 +27,11 @@ namespace Devcade {
     }
 
     #region States
-    private static GamePadState p1State;
-    private static GamePadState p1LastState;
+    public static GamePadState p1State { get; private set; }
+    public static GamePadState p1LastState { get; private set; }
 
-    private static GamePadState p2State;
-    private static GamePadState p2LastState;
+    public static GamePadState p2State { get; private set; }
+    public static GamePadState p2LastState { get; private set; }
     #endregion
     
     private static bool externalUpdate;

@@ -9,7 +9,8 @@ A monogame library for allowing games to interact with cabinet functions.
 - [Event-Based Input](#input-events)
   - [CButton](#Combined-button)
   - [Callbacks](#Callbacks)
-
+- [Save data](#save-data)
+  
 ---
 ---
 
@@ -170,3 +171,17 @@ submenuManager.onPressed(down, () => {
 ```
 
 ---
+## Save data
+In the Devcade.SaveData namespace, the SaveManager singleton class has two methods used to save or load text data to or from the cloud.
+
+### `SaveText(string path, string data)`
+Saves the given data to the given path, returns true if it succeeds. Note: This will overwrite if the file already exists.
+
+Example: `SaveManager.Instance.SaveText("saves/user/save1.txt", "This is save data");`
+
+---
+
+### `LoadText(string path)`
+Loads data from a given path, returns the loaded data.
+
+Example: `SaveManager.Instance.LoadText("saves/user/save1.txt");`
