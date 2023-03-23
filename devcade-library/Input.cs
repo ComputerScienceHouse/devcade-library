@@ -152,9 +152,9 @@ namespace Devcade {
       p1State = GamePad.GetState(0);
       p2State = GamePad.GetState(1);
     }
-      
-    public static (GamePadState, GamePadState) GetStates() {
-      return (p1State, p2State);
+    
+    public static (GamePadState player1, GamePadState player2) GetStates() {
+      return (player1: p1State, player2: p2State);
     }
   }
 }
