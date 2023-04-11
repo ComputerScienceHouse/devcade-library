@@ -19,7 +19,7 @@ A monogame library for allowing games to interact with cabinet functions.
 - Menu
 - StickUp, StickDown, StickRight, and StickLeft
 
-These defifne the buttons of the devcade cabinet to be used in the get methods below.
+These define the buttons of the devcade cabinet to be used in the get methods below.
 
 These values are equivelant to values of the `Buttons` enum built in to xna and can be used in place of them when explicitly cast to a `Buttons`. This allows existing controller input code to be easily adapted to the Devcade control scheme.
 
