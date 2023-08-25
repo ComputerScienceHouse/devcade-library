@@ -1,135 +1,441 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
+using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace Devcade
-{
-  namespace SaveData
-  {
-    using System.IO;
-    using Newtonsoft.Json;
+namespace Devcade;
+public enum StorageType {
+    Local,
+    Remote,
+}
+
+#nullable enable
+public static class Persistence {
+    private static Socket _socket;
+    private static StreamWriter _writeHalf;
+    private static StreamReader _readHalf;
+    private static Dictionary<string, Dictionary<string, string>> _data;
+    private static StorageType _storage_type;
+    private static string _path = "."; // for local storage
+    
+    private static Thread _thread;
+    private static Dictionary<uint, TaskCompletionSource<Response>> _requests = new();
+    
+    public static bool initalized => _storage_type == StorageType.Local ? _data != null : _writeHalf != null;
 
     /// <summary>
-    /// Singleton class to save and load data through a backend.
+    /// Initalize the persistence system. This should be called before saving
+    /// or loading any data. If you are running on devcade, this will connect
+    /// to the backend. If you are running locally, this will save / load to
+    /// your filesystem.
     /// </summary>
-    public class SaveManager
-    {
-      /// <summary>
-      /// Simple struct to represent a request message.
-      /// </summary>
-      private struct Request
-      {
-        private string command;
-        private string path;
-        private string data;
-
-        public string Command { get => command; }
-        public string Path { get => path; }
-        public string Data { get => data; }
-
-        /// <summary>
-        /// Create a request object with the specified properties.
-        /// </summary>
-        /// <param name="command">The command to send to the backend.</param>
-        /// <param name="path">Path to use for this command.</param>
-        /// <param name="data">Any data to be sent with this command.</param>
-        public Request(string command, string path, string data)
-        {
-          this.command = command;
-          this.path = path;
-          this.data = data;
+    public static void Init() {
+        if (OnDevcade()) {
+            initRemote();
+        } else {
+            initLocal();
         }
-      }
-
-      /// <summary>
-      /// Simple struct to represent a response message.
-      /// </summary>
-      private struct Response
-      {
-        private bool success;
-        private string error;
-        private string data;
-
-        public bool Success { get => success; }
-        public string Error { get => error; }
-        public string Data { get => data; }
-
-        /// <summary>
-        /// Create a request object with the specified properties.
-        /// </summary>
-        /// <param name="success">Weather the command succeeded.</param>
-        /// <param name="error">Any error messages applicable.</param>
-        /// <param name="data">Any data returned.</param>
-        public Response(bool success, string error, string data)
-        {
-          this.success = success;
-          this.error = error;
-          this.data = data;
-        }
-      }
-
-      private static SaveManager instance;
-      private StreamWriter pipeOut;
-      private StreamReader pipeIn;
-
-      public static SaveManager Instance
-      {
-        get
-        {
-          if (instance == null)
-          {
-            instance = new SaveManager();
-          }
-          return instance;
-        }
-      }
-
-      /// <summary>
-      /// Creates a Saves object and initializes the pipes.
-      /// </summary>
-      private SaveManager()
-      {
-        // This goes to read_game because the pipes are named from the backends perspective
-        pipeOut = new StreamWriter(Environment.GetEnvironmentVariable("DEVCADE_PATH") + "/read_game");
-
-        pipeIn = new StreamReader(Environment.GetEnvironmentVariable("DEVCADE_PATH") + "/write_game");
-      }
-
-      /// <summary>
-      /// Save arbitrary text data to the cloud.
-      /// </summary>
-      /// <param name="path">Path of the file to save to in your s3 bucket. NOTE: Overwrites if the file exists already.</param>
-      /// <param name="data">Text data to be saved.</param>
-      /// <returns>True if successful, false otherwise.</returns>
-      public bool SaveText(string path, string data)
-      {
-        pipeOut.WriteLine(JsonConvert.SerializeObject(new Request("Save Data", path, data)));
-        pipeOut.Flush();
-
-        return JsonConvert.DeserializeObject<Response>(pipeIn.ReadLine()).Success;
-      }
-
-      /// <summary>
-      /// Load arbitrary text data from the cloud.
-      /// </summary>
-      /// <param name="path">Path of the file in your s3 bucket.</param>
-      /// <returns>Data loaded as string.</returns>
-      public string LoadText(string path)
-      {
-        pipeOut.WriteLine(JsonConvert.SerializeObject(new Request("Load Data", path, "")));
-        pipeOut.Flush();
-
-        return JsonConvert.DeserializeObject<Response>(pipeIn.ReadLine()).Data;
-      }
-
-      /// <summary>
-      /// Closes the pipe files as this is destroyed.
-      /// </summary>
-      ~SaveManager()
-      {
-        pipeIn.Close();
-        pipeOut.Close();
-      }
     }
-  }
+    
+    /// <summary>
+    /// Testing function to force local storage. Will be removed in the future.
+    /// (hopefully before this is ever released)
+    /// </summary>
+    public static void InitForceLocal() {
+        initLocal();
+    }
+    
+    /// <summary>
+    /// Testing function to force remote storage. Will be removed in the future.
+    /// (hopefully before this is ever released)
+    /// </summary>
+    public static void InitForceRemote() {
+        initRemote();
+    }
+    
+    /// <summary>
+    /// Sets the local path to save data to. This should be called before
+    /// flusing any data to disk, or loading any data from disk. This has
+    /// no effect if you are running on devcade.
+    /// </summary>
+    public static void SetLocalPath(string path) {
+        _path = path;
+    }
+
+    [DoesNotReturn]
+    private static void Run() {
+        string devcade_path = Environment.GetEnvironmentVariable("DEVCADE_PATH") ?? "/tmp/devcade";
+        string sock_path = $"{devcade_path}/persistence.sock";
+        tryOpenSocket(sock_path);
+        while (_socket == null) {
+            Console.WriteLine($"Could not connect to {sock_path}, retrying... (are you running on devcade?)");
+            Thread.Sleep(1000);
+            tryOpenSocket(sock_path);
+        }
+        
+        _data = new Dictionary<string, Dictionary<string, string>>();
+
+        Console.WriteLine("DEBUG: Starting read loop");
+        while (true) {
+            string message = _readHalf.ReadLine() ?? "";
+            if (message == "") {
+                Thread.Sleep(100);
+            }
+
+            Console.WriteLine("DEBUG: Got message: " + message);
+            var response = Response.FromJson(message);
+            if (_requests.ContainsKey(response.request_id)) {
+                _requests[response.request_id].SetResult(response);
+                _requests.Remove(response.request_id);
+            } else {
+                Console.WriteLine($"DEBUG: Got unexpected response: {response}");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Saves a value to either a local map or the devcade backend.
+    /// </summary>
+    public static async Task<Response> Save<T>(string group, string key, T value, JsonSerializerOptions? serializerOptions) {
+        if (!typeof (T).IsSerializable) throw new ArgumentException("Type is not serializable");
+        if (!initalized) throw new InvalidOperationException("Persistence not initalized yet (call Persistence.Init() or wait longer after calling it)");
+        return _storage_type switch { 
+            StorageType.Local => saveLocal(group, key, value, serializerOptions),
+            StorageType.Remote => await saveRemote(group, key, value, serializerOptions),
+            _ => throw new Exception("Invalid storage type"),
+            };
+    }
+
+    public static Response SaveSync<T>(string group, string key, T value, JsonSerializerOptions? serializerOptions) {
+        var task = Save(group, key, value, serializerOptions);
+        task.Wait();
+        return task.Result;
+    }
+    
+    private static Response saveLocal<T>(string group, string key, T value, JsonSerializerOptions? serializerOptions) {
+        if (!_data.ContainsKey(group)) {
+            var path_parts = group.Split('/');
+            // group path part is everything but the last part
+            var group_path = string.Join('/', path_parts[..^1]);
+            if (!Directory.Exists($"{_path}/{group_path}")) {
+                Directory.CreateDirectory($"{_path}/{group_path}");
+            }
+            if (File.Exists($"{_path}/{group}.save")) {
+                _data[group] = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText($"{_path}/{group}.save")) ?? new Dictionary<string, string>();
+            } else {
+                _data[group] = new Dictionary<string, string>();
+            }
+        }
+        _data[group][key] = JsonSerializer.Serialize(value, serializerOptions);
+        return Response.FromOk();
+    }
+
+    private static async Task<Response> saveRemote<T>(string group, string key, T value, JsonSerializerOptions? serializerOptions) {
+        string json = JsonSerializer.Serialize(value, serializerOptions);
+        Request req = Request.SaveRequest(group, key, json);
+        TaskCompletionSource<Response> tcs = new TaskCompletionSource<Response>();
+        _requests[req.request_id] = tcs;
+        write(req.Serialize());
+        return await tcs.Task;
+    }
+    
+    /// <summary>
+    /// Loads a value from either a local map, local filesystem or the devcade backend.
+    /// </summary>
+    public static async Task<Response> Load<T>(string group, string key, JsonSerializerOptions? serializerOptions) {
+        return _storage_type switch {
+            StorageType.Local => Response.FromObject(loadLocal<T>(group, key, serializerOptions)),
+            StorageType.Remote => await loadRemote(group, key),
+            _ => throw new Exception("Invalid storage type")
+        };
+    }
+
+    public static T? LoadSync<T>(string group, string key, JsonSerializerOptions? serializerOptions) {
+        var task = Load<T>(group, key, serializerOptions);
+        task.Wait();
+        return task.Result.GetObject<T>(serializerOptions) ?? default;
+    }
+    
+    private static T? loadLocal<T>(string group, string key, JsonSerializerOptions? serializerOptions) {
+        if (!_data.ContainsKey(group)) {
+            string[] path_parts = group.Split('/');
+            // group path part is everything but the last part
+            string group_path = string.Join('/', path_parts[..^1]);
+            if (!Directory.Exists($"{_path}/{group_path}")) {
+                Directory.CreateDirectory($"{_path}/{group_path}");
+            }
+            if (File.Exists($"{_path}/{group}.save")) {
+                _data[group] = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText($"{_path}/{group}.save")) ?? new Dictionary<string, string>();
+            } else {
+                _data[group] = new Dictionary<string, string>();
+            }
+        }
+        return !_data[group].ContainsKey(key) ? default : JsonSerializer.Deserialize<T>(_data[group][key], serializerOptions);
+    }
+    
+    private static Task<Response> loadRemote(string group, string key) {
+        var req = Request.LoadRequest(group, key);
+        var tcs = new TaskCompletionSource<Response>();
+        _requests[req.request_id] = tcs;
+        write(req.Serialize());
+        return tcs.Task;
+    }
+    
+    /// <summary>
+    /// Flushes all data to disk (if local) otherwise sends a flush request to the backend.
+    /// </summary>
+    public static async Task<Response> Flush() {
+        return _storage_type switch {
+            StorageType.Local => await flushLocal(),
+            StorageType.Remote => await flushRemote(),
+            _ => throw new Exception("Invalid storage type")
+        };
+    }
+    
+    private static async Task<Response> flushLocal() {
+        foreach ((string group, var data) in _data) {
+            string group_path = string.Join('/', group.Split('/')[..^1]);
+            if (!Directory.Exists($"{_path}/{group_path}")) {
+                Directory.CreateDirectory($"{_path}/{group_path}");
+            }
+            await File.WriteAllTextAsync($"{_path}/{group}.save", JsonSerializer.Serialize(data));
+        }
+        return Response.FromOk();
+    }
+    
+    private static async Task<Response> flushRemote() {
+        var req = Request.FlushRequest();
+        var tcs = new TaskCompletionSource<Response>();
+        _requests[req.request_id] = tcs;
+        write(req.Serialize());
+        return await tcs.Task;
+    }
+
+    /// <summary>
+    /// Checks whether running on devcade or not.
+    /// </summary>
+    /// <returns></returns>
+    public static bool OnDevcade() {
+        // check if /home/devcade exists
+        return Directory.Exists("/home/devcade");
+    }
+
+    private static void initLocal() {
+        Console.WriteLine("DEBUG: Initializing local storage");
+        _storage_type = StorageType.Local;
+        _data = new Dictionary<string, Dictionary<string, string>>();
+    }
+
+    private static void initRemote() {
+        Console.WriteLine("DEBUG: Initializing remote storage");
+        _storage_type = StorageType.Remote;
+        _thread = new Thread(Run) {IsBackground = true};
+        _thread.Start();
+    }
+
+    private static Socket? tryOpenSocket(string path) {
+        Console.WriteLine($"DEBUG: Trying to open socket @ {path}");
+        try {
+            _socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP);
+            var endpoint = new UnixDomainSocketEndPoint(path);
+            _socket.Connect(endpoint);
+            
+            var stream = new NetworkStream(_socket);
+            _readHalf = new StreamReader(stream, new UTF8Encoding(false));
+            _writeHalf = new StreamWriter(stream, new UTF8Encoding(false));
+            return _socket;
+        } catch (Exception e) {
+            Console.WriteLine("DEBUG ERROR: Failed to open socket: " + e.Message);
+            _socket = null;
+            return null;
+        }
+    }
+
+    private static void write(string message) {
+        Console.WriteLine($"DEBUG: Writing to socket: {message}");
+        _writeHalf.WriteLine(message);
+        _writeHalf.Flush();
+        _writeHalf.BaseStream.Flush();
+    }
+
+    private static string read() {
+        try {
+            return _readHalf.ReadLine() ?? "";
+        } catch (Exception e) {
+            Console.WriteLine("DEBUG ERROR: Failed to read from socket: " + e.Message);
+            return "";
+        }
+    }
+
+    private sealed class Request {
+        private enum RequestType {
+            Save,
+            Load,
+            Flush,
+        }
+        
+        public readonly uint request_id;
+        private readonly RequestType type;
+        private readonly string? group;
+        private readonly string? key;
+        private readonly string? value;
+        
+        private static uint _next_request_id;
+        
+        private Request (uint request_id, RequestType type, string? group, string? key, string? value) {
+            this.request_id = request_id;
+            this.type = type;
+            this.group = group;
+            this.key = key;
+            this.value = value;
+        }
+        
+        public static Request SaveRequest(string group, string key, string value) {
+            return new Request(_next_request_id++, RequestType.Save, group, key, value);
+        }
+        
+        public static Request LoadRequest(string group, string key) {
+            return new Request(_next_request_id++, RequestType.Load, group, key, null);
+        }
+        
+        public static Request FlushRequest() {
+            return new Request(_next_request_id++, RequestType.Flush, null, null, null);
+        }
+
+        public string Serialize() {
+            string s = type switch {
+                RequestType.Save =>
+                    $"{{\"request_id\": {request_id}, \"type\": \"Save\", \"data\": [\"{group}\", \"{key}\", \"{value}\"]}}",
+                RequestType.Load => $"{{\"request_id\": {request_id}, \"type\": \"Load\", \"data\": [\"{group}\", \"{key}\"]}}",
+                RequestType.Flush => $"{{\"request_id\": {request_id}, \"type\": \"Flush\"}}",
+            };
+            return s;
+        }
+    }
+
+    public sealed class Response {
+        public enum ResponseType {
+            Ok,
+            Err,
+            Object,
+        }
+
+        private Dictionary<string, object> _data;
+        private object? _object;
+        
+        public uint request_id { get; private set; }
+
+        public ResponseType type => (ResponseType) Enum.Parse(typeof(ResponseType), JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(_data["type"])) ?? "");
+
+        public string? error => type == ResponseType.Err && _data.ContainsKey("data") ? JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(_data["data"])) ?? "" : null;
+
+
+        private Response() {
+            _data = new Dictionary<string, object>();
+        }
+
+        public T? GetObject<T>(JsonSerializerOptions? serializerOptions) {
+            if (_object != null && type == ResponseType.Object) return (T) _object;
+            if (_data != null) {
+                string s_deser = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(_data["data"]), serializerOptions) ?? "";
+                switch (typeof(T).ToString())
+                {
+                    // C# can't switch on types so we have to use strings
+                    // C# also can't deserialize to number types so we have to do that manually too
+                    case "System.Int32":
+                        _object = int.Parse(s_deser);
+                        break;
+                    case "System.UInt32":
+                        _object = uint.Parse(s_deser);
+                        break;
+                    case "System.Int64":
+                        _object = long.Parse(s_deser);
+                        break;
+                    case "System.UInt64":
+                        _object = ulong.Parse(s_deser);
+                        break;
+                    case "System.Int16":
+                        _object = short.Parse(s_deser);
+                        break;
+                    case "System.UInt16":
+                        _object = ushort.Parse(s_deser);
+                        break;
+                    case "System.Byte":
+                        _object = byte.Parse(s_deser);
+                        break;
+                    case "System.SByte":
+                        _object = sbyte.Parse(s_deser);
+                        break;
+                    case "System.Single":
+                        _object = float.Parse(s_deser);
+                        break;
+                    case "System.Double":
+                        _object = double.Parse(s_deser);
+                        break;
+                    case "System.Decimal":
+                        _object = decimal.Parse(s_deser);
+                        break;
+                    default:
+                        _object = JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(_data["data"]), serializerOptions);
+                        break;
+                }
+            }
+            return (T?) _object;
+        }
+
+        public bool IsOk() {
+            return type is ResponseType.Ok;
+        }
+
+        public bool IsErr() {
+            return type is ResponseType.Err;
+        }
+        
+        public bool IsObject() {
+            return type is ResponseType.Object;
+        }
+
+        public static Response FromJson(string json) {
+            Response r = new() {
+                _data = JsonSerializer.Deserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>()
+            };
+            uint id = JsonSerializer.SerializeToDocument(r._data["request_id"]).RootElement.Deserialize<uint>();
+            r.request_id = id;
+            return r;
+        }
+
+        internal static Response FromObject(object? obj) {
+            Response r = obj != null ? new Response {
+                _object = obj,
+                _data = {
+                    ["request_id"] = uint.MaxValue,
+                    ["type"] = "Object",
+                }
+            } : new Response {
+                _data = {
+                    ["request_id"] = uint.MaxValue,
+                    ["type"] = "Err",
+                    ["data"] = "Locally stored value not found"
+                }
+            };
+            return r;
+        }
+
+        internal static Response FromOk() {
+            Response r = new Response {
+                _data = {
+                    ["request_id"] = uint.MaxValue,
+                    ["type"] = "Ok",
+                }
+            };
+            return r;
+        }
+    }
 }
