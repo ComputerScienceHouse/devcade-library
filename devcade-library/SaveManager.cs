@@ -71,27 +71,26 @@ public static class Persistence {
         string sock_path = $"{devcade_path}/game.sock";
         tryOpenSocket(sock_path);
         while (_socket == null) {
-            Console.WriteLine($"Could not connect to {sock_path}, retrying... (are you running on devcade?)");
+            Console.WriteLine($"[Library.Persistence] Could not connect to {sock_path}, retrying... (are you running on devcade?)");
             Thread.Sleep(1000);
             tryOpenSocket(sock_path);
         }
         
         _data = new Dictionary<string, Dictionary<string, string>>();
 
-        Console.WriteLine("DEBUG: Starting read loop");
+        Console.WriteLine("[Library.Persistence] Starting read loop");
         while (true) {
             string message = _readHalf.ReadLine() ?? "";
             if (message == "") {
                 Thread.Sleep(100);
             }
 
-            Console.WriteLine("DEBUG: Got message: " + message);
             var response = Response.FromJson(message);
             if (_requests.ContainsKey(response.request_id)) {
                 _requests[response.request_id].SetResult(response);
                 _requests.Remove(response.request_id);
             } else {
-                Console.WriteLine($"DEBUG: Got unexpected response: {response}");
+                Console.WriteLine($"[Library.Persistence] Got unexpected response: {response}");
             }
         }
     }
@@ -267,20 +266,20 @@ public static class Persistence {
     }
 
     private static void initLocal() {
-        Console.WriteLine("DEBUG: Initializing local storage");
+        Console.WriteLine("[Library.Persistence] Initializing local storage");
         _storage_type = StorageType.Local;
         _data = new Dictionary<string, Dictionary<string, string>>();
     }
 
     private static void initRemote() {
-        Console.WriteLine("DEBUG: Initializing remote storage");
+        Console.WriteLine("[Library.Persistence] Initializing remote storage");
         _storage_type = StorageType.Remote;
         _thread = new Thread(Run) {IsBackground = true};
         _thread.Start();
     }
 
     private static Socket? tryOpenSocket(string path) {
-        Console.WriteLine($"DEBUG: Trying to open socket @ {path}");
+        Console.WriteLine($"[Library.Persistence] Trying to open socket @ {path}");
         try {
             _socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP);
             var endpoint = new UnixDomainSocketEndPoint(path);
@@ -291,14 +290,13 @@ public static class Persistence {
             _writeHalf = new StreamWriter(stream, new UTF8Encoding(false));
             return _socket;
         } catch (Exception e) {
-            Console.WriteLine("DEBUG ERROR: Failed to open socket: " + e.Message);
+            Console.WriteLine("[Library.Persistence] ERROR: Failed to open socket: " + e.Message);
             _socket = null;
             return null;
         }
     }
 
     private static void write(string message) {
-        Console.WriteLine($"DEBUG: Writing to socket: {message}");
         _writeHalf.WriteLine(message);
         _writeHalf.Flush();
         _writeHalf.BaseStream.Flush();
@@ -308,7 +306,7 @@ public static class Persistence {
         try {
             return _readHalf.ReadLine() ?? "";
         } catch (Exception e) {
-            Console.WriteLine("DEBUG ERROR: Failed to read from socket: " + e.Message);
+            Console.WriteLine("[Library.Persistence] ERROR: Failed to read from socket: " + e.Message);
             return "";
         }
     }
@@ -384,7 +382,7 @@ public static class Persistence {
         public T? GetObject<T>(JsonSerializerOptions? serializerOptions) {
             if (_object != null && type == ResponseType.Object) return (T) _object;
             if (type == ResponseType.Err) {
-                Console.WriteLine("DEBUG ERROR: Tried to get object from error response" +
+                Console.WriteLine("[Library.Persistence] WARN: Tried to get object from error response" +
                                   (error != null ? $": {error}" : ""));
                 return default;
             }
@@ -393,7 +391,7 @@ public static class Persistence {
             try { 
                 s_deser = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(_data["data"]), serializerOptions) ?? "";
             } catch (Exception e) {
-                Console.WriteLine("DEBUG ERROR: Failed to deserialize object: " + e.Message);
+                Console.WriteLine("[Library.Persistence] WARN: Failed to deserialize object: " + e.Message);
                 return default;
             }
 
@@ -423,7 +421,7 @@ public static class Persistence {
                 string intermediate = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(_data["data"])) ?? "";
                 return JsonSerializer.Deserialize<T>(intermediate);
             } catch (Exception e) {
-                Console.WriteLine("DEBUG ERROR: Failed to deserialize object: " + e.Message);
+                Console.WriteLine("[Library.Persistence] WARN: Failed to deserialize object: " + e.Message);
                 return default;
             }
         }
