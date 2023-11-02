@@ -43,27 +43,12 @@ public static class Persistence {
             initLocal();
         }
     }
-    
-    /// <summary>
-    /// Testing function to force local storage. Will be removed in the future.
-    /// (hopefully before this is ever released)
-    /// </summary>
-    public static void InitForceLocal() {
-        initLocal();
-    }
-    
-    /// <summary>
-    /// Testing function to force remote storage. Will be removed in the future.
-    /// (hopefully before this is ever released)
-    /// </summary>
-    public static void InitForceRemote() {
-        initRemote();
-    }
-    
+
     /// <summary>
     /// Sets the local path to save data to. This should be called before
     /// flusing any data to disk, or loading any data from disk. This has
-    /// no effect if you are running on devcade.
+    /// no effect if you are running on devcade, and only affects the local
+    /// storage location for testing games on your own machine.
     /// </summary>
     public static void SetLocalPath(string path) {
         _path = path;
@@ -101,8 +86,20 @@ public static class Persistence {
     }
     
     /// <summary>
-    /// Saves a value to either a local map or the devcade backend.
+    /// Saves a value to either a local map, local filesystem or the devcade backend. Returns an async task that
+    /// will complete when the save is finished. Must be awaited to ensure the save is complete.
+    /// Check Save(...).Result.IsOk() to ensure the save was successful.
     /// </summary>
+    /// <param name="group">A 'group' to save the data in. Different groups can have the same key without collision
+    /// and will be stored separately, so loading a small subset of data can be faster if you store a lot of data</param>
+    /// <param name="key">The key to be used, along with the group, to uniquely identify an entry.</param>
+    /// <param name="value">The object to serialize and save</param>
+    /// <param name="serializerOptions">Optional parameter to customize the serialization process, use this to ensure
+    /// serialized data are saved and loaded correctly.</param>
+    /// <typeparam name="T">The type of the object to be saved</typeparam>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException">If the passed type is not serializeable</exception>
+    /// <exception cref="InvalidOperationException">If Save() is called before Init()</exception>
     public static async Task<Response> Save<T>(string group, string key, T value, JsonSerializerOptions? serializerOptions) {
         if (!typeof (T).IsSerializable) throw new ArgumentException("Type is not serializable");
         if (!initalized) throw new InvalidOperationException("Persistence not initalized yet (call Persistence.Init() or wait longer after calling it)");
@@ -113,12 +110,20 @@ public static class Persistence {
             };
     }
 
+    /// <summary>
+    /// See <see cref="Save{T}"/> For more information. This is a blocking version of Save&lt;T&gt;  that will block until the save is
+    /// complete. Check SaveSync(...).IsOk() to ensure the save was successful. This method is not recommended for
+    /// multiple saves in a row, as it will block the thread until the save is complete. Instead, use multiple calls to
+    /// Save(...) and await the returned tasks all at once.
+    /// </summary>
     public static Response SaveSync<T>(string group, string key, T value, JsonSerializerOptions? serializerOptions) {
         var task = Save(group, key, value, serializerOptions);
         task.Wait();
         return task.Result;
     }
     
+    // Internal method to save data to the local filesystem (not the devcade backend)
+    // Used when developing locally or if you're just running the game on your own machine
     private static Response saveLocal<T>(string group, string key, T value, JsonSerializerOptions? serializerOptions) {
         if (!_data.ContainsKey(group)) {
             var path_parts = group.Split('/');
@@ -137,6 +142,8 @@ public static class Persistence {
         return Response.FromOk();
     }
 
+    // Internal method to save data to the devcade backend, used when running on devcade, or when the user wants to be
+    // spicy and run the devcade backend locally.
     private static async Task<Response> saveRemote<T>(string group, string key, T value, JsonSerializerOptions? serializerOptions) {
         string json = JsonSerializer.Serialize(value, serializerOptions);
         Request req = Request.SaveRequest(group, key, json);
@@ -147,8 +154,17 @@ public static class Persistence {
     }
     
     /// <summary>
-    /// Loads a value from either a local map, local filesystem or the devcade backend.
+    /// Loads a value from either a local map, local filesystem or the devcade backend. Returns an async task that
+    /// will complete when the load is finished. Must be awaited to ensure the load is complete.
+    /// The loaded value can be accessed through Load(...).Result.GetObject<T>(serializerOptions)
     /// </summary>
+    /// <param name="group">>A 'group' to load the data from. Different groups can have the same key without collision
+    /// and will be stored separately, so loading a small subset of data can be faster if you store a lot of data</param>
+    /// <param name="key"></param>
+    /// <param name="serializerOptions"></param>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
     public static async Task<Response> Load<T>(string group, string key, JsonSerializerOptions? serializerOptions) {
         return _storage_type switch {
             StorageType.Local => Response.FromObject(loadLocal<T>(group, key, serializerOptions)),
@@ -157,6 +173,18 @@ public static class Persistence {
         };
     }
 
+    /// <summary>
+    /// See <see cref="Load{T}"/> For more information. This is a blocking version of Load&lt;T&gt;  that will block until the load is
+    /// complete, and will attempt to unwrap the response into a T. This will discard any errors that occur during the
+    /// load, and return null if the load fails. This method is not recommended for multiple loads in a row, as it will
+    /// block the thread until the load is complete. Instead, use multiple calls to Load(...) and await the returned
+    /// tasks all at once.
+    /// </summary>
+    /// <param name="group"></param>
+    /// <param name="key"></param>
+    /// <param name="serializerOptions"></param>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
     public static T? LoadSync<T>(string group, string key, JsonSerializerOptions? serializerOptions) {
         var task = Load<T>(group, key, serializerOptions);
         task.Wait();
