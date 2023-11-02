@@ -45,6 +45,17 @@ public static class Persistence {
     }
 
     /// <summary>
+    /// Used to force the game to use the onboard backend, even when developing
+    /// locally. This is useful for testing the backend and library locally, but
+    /// shouldn't be needed in most cases. You can use this if you're having issues
+    /// with saving / loading on devcade but not locally, or just ask a devcade
+    /// admin (joeneil) to check the logs for you and fix the library.
+    /// </summary>
+    public static void InitForceRemote() {
+        initRemote();
+    }
+
+    /// <summary>
     /// Sets the local path to save data to. This should be called before
     /// flusing any data to disk, or loading any data from disk. This has
     /// no effect if you are running on devcade, and only affects the local
@@ -57,7 +68,7 @@ public static class Persistence {
     [DoesNotReturn]
     private static void Run() {
         string devcade_path = Environment.GetEnvironmentVariable("DEVCADE_PATH") ?? "/tmp/devcade";
-        string sock_path = $"{devcade_path}/persistence.sock";
+        string sock_path = $"{devcade_path}/game.sock";
         tryOpenSocket(sock_path);
         while (_socket == null) {
             Console.WriteLine($"Could not connect to {sock_path}, retrying... (are you running on devcade?)");
@@ -338,9 +349,10 @@ public static class Persistence {
         }
 
         public string Serialize() {
+            bool quoteValue = value != null && value[0] != '{' && value[0] != '[';
+            string v = value?.Replace("\"", "\\\"") ?? "null";
             string s = type switch {
-                RequestType.Save =>
-                    $"{{\"request_id\": {request_id}, \"type\": \"Save\", \"data\": [\"{group}\", \"{key}\", \"{value}\"]}}",
+                RequestType.Save => $"{{\"request_id\": {request_id}, \"type\": \"Save\", \"data\": [\"{group}\", \"{key}\", \"{v}\"]}}",
                 RequestType.Load => $"{{\"request_id\": {request_id}, \"type\": \"Load\", \"data\": [\"{group}\", \"{key}\"]}}",
                 RequestType.Flush => $"{{\"request_id\": {request_id}, \"type\": \"Flush\"}}",
             };
@@ -371,51 +383,49 @@ public static class Persistence {
 
         public T? GetObject<T>(JsonSerializerOptions? serializerOptions) {
             if (_object != null && type == ResponseType.Object) return (T) _object;
-            if (_data != null) {
-                string s_deser = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(_data["data"]), serializerOptions) ?? "";
-                switch (typeof(T).ToString())
-                {
-                    // C# can't switch on types so we have to use strings
-                    // C# also can't deserialize to number types so we have to do that manually too
-                    case "System.Int32":
-                        _object = int.Parse(s_deser);
-                        break;
-                    case "System.UInt32":
-                        _object = uint.Parse(s_deser);
-                        break;
-                    case "System.Int64":
-                        _object = long.Parse(s_deser);
-                        break;
-                    case "System.UInt64":
-                        _object = ulong.Parse(s_deser);
-                        break;
-                    case "System.Int16":
-                        _object = short.Parse(s_deser);
-                        break;
-                    case "System.UInt16":
-                        _object = ushort.Parse(s_deser);
-                        break;
-                    case "System.Byte":
-                        _object = byte.Parse(s_deser);
-                        break;
-                    case "System.SByte":
-                        _object = sbyte.Parse(s_deser);
-                        break;
-                    case "System.Single":
-                        _object = float.Parse(s_deser);
-                        break;
-                    case "System.Double":
-                        _object = double.Parse(s_deser);
-                        break;
-                    case "System.Decimal":
-                        _object = decimal.Parse(s_deser);
-                        break;
-                    default:
-                        _object = JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(_data["data"]), serializerOptions);
-                        break;
-                }
+            if (type == ResponseType.Err) {
+                Console.WriteLine("DEBUG ERROR: Tried to get object from error response" +
+                                  (error != null ? $": {error}" : ""));
+                return default;
             }
+            if (_data == null) return (T?)_object;
+            string s_deser;
+            try { 
+                s_deser = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(_data["data"]), serializerOptions) ?? "";
+            } catch (Exception e) {
+                Console.WriteLine("DEBUG ERROR: Failed to deserialize object: " + e.Message);
+                return default;
+            }
+
+            _object = typeof(T).ToString() switch {
+                // C# can't switch on types so we have to use strings
+                // C# also can't deserialize to number types so we have to do that manually too
+                "System.Int32" => int.Parse(s_deser),
+                "System.UInt32" => uint.Parse(s_deser),
+                "System.Int64" => long.Parse(s_deser),
+                "System.UInt64" => ulong.Parse(s_deser),
+                "System.Int16" => short.Parse(s_deser),
+                "System.UInt16" => ushort.Parse(s_deser),
+                "System.Byte" => byte.Parse(s_deser),
+                "System.SByte" => sbyte.Parse(s_deser),
+                "System.Single" => float.Parse(s_deser),
+                "System.Double" => double.Parse(s_deser),
+                "System.Decimal" => decimal.Parse(s_deser),
+                _ => this.deserialize<T>() ?? default
+            };
             return (T?) _object;
+        }
+
+        private T? deserialize<T>() {
+            try {
+                // Serialized objects are wrapped in a string so that serde can deserialize arbitrary types into a string
+                // without having to know the type at compile time (or at all).
+                string intermediate = JsonSerializer.Deserialize<string>(JsonSerializer.Serialize(_data["data"])) ?? "";
+                return JsonSerializer.Deserialize<T>(intermediate);
+            } catch (Exception e) {
+                Console.WriteLine("DEBUG ERROR: Failed to deserialize object: " + e.Message);
+                return default;
+            }
         }
 
         public bool IsOk() {
