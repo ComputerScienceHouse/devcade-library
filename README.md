@@ -95,18 +95,37 @@ if (Devcade.Input.GetStick(1).Y < 0){
 ---
 
 ## Save data
-In the Devcade.SaveData namespace, the SaveManager singleton class has two methods used to save or load text data to or from the cloud.
 
-**Warning: These methods will not work on windows at all. Calling them on windows _WILL_ crash. On linux it requires fifo pipes open at `Environment.GetEnvironmentVariable("DEVCADE_PATH") + "/read_game"` and `Environment.GetEnvironmentVariable("DEVCADE_PATH") + "/write_game"`**
+Before any data is saved `Init()` must be called once. This sets up the thread that will handle saving and loading.
 
-### `SaveText(string path, string data)`
-Saves the given data to the given path, returns true if it succeeds. Note: This will overwrite if the file already exists.
+The two main methods are `SaveData.Save()` and `SaveData.Load<T>()`. These are used to save and load data respectively, and are both asynchronous. Thus, they return a `Task<Result>`. This can be awaited or ignored as needed.
 
-Example: `SaveManager.Instance.SaveText("saves/user/save1.txt", "This is save data");`
+Sync versions of these methods are also available. These are `SaveData.SaveSync()` and `SaveData.LoadSync<T>()`. These are not recommended for many saves/loads at once as they will block the main thread while saving and loading.
 
----
+### Saving data
 
-### `LoadText(string path)`
-Loads data from a given path, returns the loaded data.
+`SaveData.Save(string group, string key, T value, JsonSerializationSettings serializerOptions = null)`
 
-Example: `SaveManager.Instance.LoadText("highscores.txt");`
+All data in a given group are stored in the same file, so using multiple groups can prevent key collisions and speed up loading for large amounts of data.
+
+The key is the name of the data to be saved. This can be any string and is used to identify the data when loading.
+
+This method accepts and type of data that can be serialized by Newtonsoft.Json. This includes most built in types and any simple classes that do not contain circular references.
+
+The serializerOptions parameter is optional and allows for customizing the serialization process. This can be used to ignore certain properties or to change the formatting of the data.
+
+### Loading data
+
+`SaveData.Load<T>(string group, string key, JsonSerializationSettings serializerOptions = null)`
+
+This method returns the data saved with the given key in the given group. If no data is found it will return the default value for the type.
+
+For reference types this will be null, for value types this will be the default value for that type.
+
+For safety, data that is not T will be returned as null. Make sure that you load data as the same type that it was saved as.
+
+The serializerOptions parameter is optional and allows for customizing the serialization process. This can be used to ignore certain properties or to change the formatting of the data.
+
+### Additional Save/Load info
+
+The data is saved by the onboard backend to the file system currently. While running locally this will save data to the current directory, although this can be changed through the `SetLocalPath()` method.

@@ -1,17 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <RootNamespace>Devcade</RootNamespace>
     <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     <Company>Computer Science House</Company>
     <Product>Devcade</Product>
-    <Authors>Noah Emke</Authors>
+    <Authors>Noah Emke, Joe O'Neil</Authors>
     <Description>A monogame library for allowing games to interact with Devcade cabinet functions.</Description>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <RepositoryUrl>https://github.com/ComputerScienceHouse/Devcade-library</RepositoryUrl>
     <RepositoryType>Github</RepositoryType>
     <AssemblyVersion></AssemblyVersion>
-    <Version>$(VersionPrefix)1.2.0</Version>
+    <Version>$(VersionPrefix)2.0.0</Version>
     <Title>Devcade Library</Title>
     <PackageProjectUrl>https://devcade.csh.rit.edu/</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
