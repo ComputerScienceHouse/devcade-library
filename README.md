@@ -102,7 +102,7 @@ The two main methods are `SaveData.Save()` and `SaveData.Load<T>()`. These are u
 
 Sync versions of these methods are also available. These are `SaveData.SaveSync()` and `SaveData.LoadSync<T>()`. These are not recommended for many saves/loads at once as they will block the main thread while saving and loading.
 
-### Loading data
+### Saving data
 
 `SaveData.Save(string group, string key, T value, JsonSerializationSettings serializerOptions = null)`
 
@@ -114,7 +114,7 @@ This method accepts and type of data that can be serialized by Newtonsoft.Json. 
 
 The serializerOptions parameter is optional and allows for customizing the serialization process. This can be used to ignore certain properties or to change the formatting of the data.
 
-### Saving data
+### Loading data
 
 `SaveData.Load<T>(string group, string key, JsonSerializationSettings serializerOptions = null)`
 
