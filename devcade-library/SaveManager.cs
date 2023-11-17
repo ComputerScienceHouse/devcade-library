@@ -67,7 +67,11 @@ public static class Persistence {
 
     [DoesNotReturn]
     private static void Run() {
-        string devcade_path = Environment.GetEnvironmentVariable("DEVCADE_PATH") ?? "/tmp/devcade";
+        string devcade_path = Environment.GetEnvironmentVariable("DEVCADE_PATH");
+        if (devcade_path == null) {
+            Console.WriteLine("DEVCADE_PATH not accessible, falling back to /home/devcade/.devcade");
+            devcade_path = "/home/devcade/.devcade";
+        }
         string sock_path = $"{devcade_path}/game.sock";
         tryOpenSocket(sock_path);
         while (_socket == null) {
