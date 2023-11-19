@@ -11,7 +11,7 @@
     <RepositoryUrl>https://github.com/ComputerScienceHouse/Devcade-library</RepositoryUrl>
     <RepositoryType>Github</RepositoryType>
     <AssemblyVersion></AssemblyVersion>
-    <Version>$(VersionPrefix)2.0.1</Version>
+    <Version>$(VersionPrefix)2.0.2</Version>
     <Title>Devcade Library</Title>
     <PackageProjectUrl>https://devcade.csh.rit.edu/</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
