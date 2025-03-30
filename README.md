@@ -16,11 +16,24 @@ To install or update this package, either use the dotnet cli by running `dotnet 
 
 ## Input wrapping
 ### ArcadeButtons enum
-`Input.ArcadeButtons` is an enum with values 
-- A1 through A4
-- B1 through B4
-- Menu
-- StickUp, StickDown, StickRight, and StickLeft
+`Input.ArcadeButtons` is an enum that maps XBox controller inputs to Devcade inputs as follows
+```
+public enum ArcadeButtons {
+      A1 = Buttons.X,
+      A2 = Buttons.Y,
+      A3 = Buttons.RightShoulder,
+      A4 = Buttons.LeftShoulder,
+      B1 = Buttons.A,
+      B2 = Buttons.B,
+      B3 = Buttons.RightTrigger,
+      B4 = Buttons.LeftTrigger,
+      Menu = Buttons.Start,
+      StickDown = Buttons.LeftThumbstickDown,
+      StickUp = Buttons.LeftThumbstickUp,
+      StickLeft = Buttons.LeftThumbstickLeft,
+      StickRight = Buttons.LeftThumbstickRight
+}
+```
 
 These define the buttons of the devcade cabinet to be used in the get methods below.
 
